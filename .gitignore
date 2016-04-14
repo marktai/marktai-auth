@@ -1,0 +1,7 @@
+pkg
+github.com
+bin
+log.txt
+*.swp
+golang.org
+creds

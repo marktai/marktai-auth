@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 )
@@ -48,8 +47,6 @@ func Verify(recaptchaResponse string) (bool, time.Time, string, error) {
 
 	urlString := fmt.Sprintf("https://www.google.com/recaptcha/api/siteverify?secret=%s&response=%s", recaptchaSecret, recaptchaResponse)
 
-	log.Println(urlString)
-
 	resp, err := http.Post(urlString, "", nil)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -67,7 +64,7 @@ func Verify(recaptchaResponse string) (bool, time.Time, string, error) {
 	}
 
 	verified = verification.Success
-	timestamp, _ = time.Parse(time.RFC3339, verification.Challenge_ts) // I trust Google to not fuck up their timestamp
+	timestamp, _ = time.Parse(time.RFC3339, verification.Challenge_ts) // I trust Google to not mess up their timestamp
 	domain = verification.Hostname
 
 	return verified, timestamp, domain, nil

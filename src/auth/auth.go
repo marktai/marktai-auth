@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"regexp"
@@ -158,7 +157,22 @@ func MakeUser(user, pass string) (uint, error) {
 	}
 
 	return id, nil
+}
 
+func ChangePassword(userid uint, pass string) error {
+	saltHash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	saltHashString := base64.StdEncoding.EncodeToString(saltHash)
+
+	changePass, err := db.Db.Prepare("UPDATE users set salthash=? where userid=?")
+	if err != nil {
+		return err
+	}
+
+	_, err = changePass.Exec(saltHashString, userid)
+	return err
 }
 
 // returns the salthash of a user

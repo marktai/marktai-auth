@@ -30,6 +30,8 @@ func Run(port int, disableAuth bool) {
 	r.HandleFunc("/verifySecret", Log(verifySecret)).Methods("POST")
 	r.HandleFunc("/users", Log(makeUser)).Methods("POST")
 
+	r.HandleFunc("/changePassword", Log(changePassword)).Methods("POST")
+
 	r.HandleFunc("/authHeaders", Log(authHeaders)).Methods("POST")
 
 	for {

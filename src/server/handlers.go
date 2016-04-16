@@ -127,7 +127,6 @@ func makeUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if requireAuth {
-
 		recaptchaResponse, ok := parsedJson["Recaptcha"]
 		if !ok {
 			WriteErrorString(w, "No 'Recaptcha' set in POST body", 400)
@@ -153,7 +152,49 @@ func makeUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJson(w, genMap("UserID", userID))
+}
 
+func changePassword(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var parsedJson map[string]string
+	err := decoder.Decode(&parsedJson)
+	if err != nil {
+		WriteError(w, err, 400)
+		return
+	}
+
+	user, ok := parsedJson["User"]
+	if !ok {
+		WriteErrorString(w, "No 'User' set in POST body", 400)
+		return
+	}
+
+	pass, ok := parsedJson["Password"]
+	if !ok {
+		WriteErrorString(w, "No 'Password' set in POST body", 400)
+		return
+	}
+
+	newPass, ok := parsedJson["NewPassword"]
+	if !ok {
+		WriteErrorString(w, "No 'NewPassword' set in POST body", 400)
+		return
+	}
+
+	userID, _, err := auth.Login(user, pass)
+	if err != nil {
+		log.Println(err)
+		WriteErrorString(w, "Not Authorized Request", 401)
+		return
+	}
+
+	err = auth.ChangePassword(userID, newPass)
+	if err != nil {
+		WriteError(w, err, 500)
+		return
+	}
+
+	w.WriteHeader(200)
 }
 
 func authHeaders(w http.ResponseWriter, r *http.Request) {

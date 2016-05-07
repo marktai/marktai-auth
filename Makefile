@@ -9,7 +9,7 @@ build: init
 	go build -o bin/auth-server src/main/main.go 
 
 run: build
-	@pkill auth-server || :
+	@pkill ^auth-server$ || :
 	bin/auth-server>log.txt 2>&1 &
 
 log: run

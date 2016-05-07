@@ -175,17 +175,28 @@ func changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var userID uint
+
 	newPass, ok := parsedJson["NewPassword"]
 	if !ok {
 		WriteErrorString(w, "No 'NewPassword' set in POST body", 400)
 		return
 	}
 
-	userID, _, err := auth.Login(user, pass)
-	if err != nil {
-		log.Println(err)
-		WriteErrorString(w, "Not Authorized Request", 401)
-		return
+	if requireAuth {
+		userID, _, err = auth.Login(user, pass)
+		if err != nil {
+			log.Println(err)
+			WriteErrorString(w, "Not Authorized Request", 401)
+			return
+		}
+	} else {
+		userID, err = auth.GetUserID(user)
+		if err != nil {
+			log.Println(err)
+			WriteErrorString(w, "No user with that username", 401)
+			return
+		}
 	}
 
 	err = auth.ChangePassword(userID, newPass)

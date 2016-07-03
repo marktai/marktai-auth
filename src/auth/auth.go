@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"database/sql"
 	"db"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"log"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -117,13 +120,13 @@ func GetUsername(userID uint) (string, error) {
 }
 
 // makes a new user and returns its id
-func MakeUser(user, pass string) (uint, error) {
+func MakeUser(user, pass, email string) (uint, error) {
 
 	// username santization in GetUserID
 	userID, err := GetUserID(user)
-	if err != nil && err.Error() != "sql: no rows in result set" {
-		// if there is an error
-		// does not include error when user is not found
+	if err == sql.ErrNoRows {
+		// do nothing if user is not created
+	} else if err != nil {
 		return 0, err
 	} else if userID != 0 {
 		return 0, errors.New("User already made")
@@ -145,21 +148,122 @@ func MakeUser(user, pass string) (uint, error) {
 		return 0, err
 	}
 
-	addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, salthash) VALUES(?, ?, ?)")
-	if err != nil {
-		return 0, err
-	}
+	if email == "" {
+		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, salthash, created) VALUES(?, ?, ?, ?)")
+		if err != nil {
+			return 0, err
+		}
 
-	_, err = addUser.Exec(id, user, saltHashString)
+		_, err = addUser.Exec(id, user, saltHashString, time.Now().UTC())
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, email, salthash, created) VALUES(?, ?, ?, ?, ?)")
+		if err != nil {
+			return 0, err
+		}
 
-	if err != nil {
-		return 0, err
+		_, err = addUser.Exec(id, user, email, saltHashString, time.Now().UTC())
+		if err != nil {
+			return 0, err
+		}
+		err = GenerateRegistrationCode(id)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return id, nil
 }
 
-func ChangePassword(userid uint, pass string) error {
+// Code Types
+// 1 : Registration code
+// 2 : Password reset code
+
+func GetCode(userID uint, codeType uint) (string, error) {
+	codeString := ""
+
+	err := db.Db.QueryRow("SELECT code FROM codes WHERE userid=? AND type=?", userID, codeType).Scan(&codeString)
+	if err != nil {
+		return "", err
+	}
+
+	return codeString, nil
+}
+
+func GetRegistrationCode(userID uint) (string, error) {
+	return GetCode(userID, 1)
+}
+
+func UseCode(userID, codeType uint, codeString string) error {
+	var exists bool
+	err := db.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM codes WHERE userid=? AND type=? AND code=?)", userID, codeType, codeString).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errors.New("Code is invalid")
+	}
+
+	addUser, err := db.Db.Prepare("DELETE FROM codes WHERE userid=? AND type=? AND code=?")
+	if err != nil {
+		return err
+	}
+
+	_, err = addUser.Exec(userID, codeType, codeString)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UseRegistrationCode(userID uint, codeString string) error {
+	err := UseCode(userID, 1, codeString)
+	if err != nil {
+		return err
+	}
+
+	addUser, err := db.Db.Prepare("UPDATE users SET registered=1 WHERE userid=?")
+	if err != nil {
+		return err
+	}
+
+	_, err = addUser.Exec(userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GenerateCode(userID, codeType uint) error {
+	codeBytes := make([]byte, 0)
+	for i := 0; i < 32; i++ {
+		codeBytes = append(codeBytes, byte(rand.Intn(256)))
+	}
+
+	codeString := hex.EncodeToString(codeBytes)
+
+	addUser, err := db.Db.Prepare("INSERT INTO codes (userid, type, code) VALUES(?, ?, ?)")
+	if err != nil {
+		return err
+	}
+
+	_, err = addUser.Exec(userID, codeType, codeString)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GenerateRegistrationCode(userID uint) error {
+	return GenerateCode(userID, 1)
+}
+
+func ChangePassword(userID uint, pass string) error {
 	saltHash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -171,7 +275,7 @@ func ChangePassword(userid uint, pass string) error {
 		return err
 	}
 
-	_, err = changePass.Exec(saltHashString, userid)
+	_, err = changePass.Exec(saltHashString, userID)
 	return err
 }
 
@@ -187,8 +291,7 @@ func getSaltHash(userID uint) ([]byte, error) {
 }
 
 // if a successful login, generates a secret or refreshes the existing one
-func Login(user, pass string) (uint, *Secret, error) {
-
+func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 	// username santization in GetUserID
 	userID, err := GetUserID(user)
 	if err != nil {
@@ -207,11 +310,21 @@ func Login(user, pass string) (uint, *Secret, error) {
 	}
 
 	if _, ok := secretMap[userID]; !ok || secretMap[userID].Expired() {
-		secret, err := newSecret()
+		secret, err := newSecret(stayLoggedIn)
 		if err != nil {
 			return 0, nil, err
 		}
 		secretMap[userID] = secret
+	}
+
+	updateLastLogin, err := db.Db.Prepare("UPDATE users set lastlogin=? where userid=?")
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_, err = updateLastLogin.Exec(time.Now().UTC(), userID)
+	if err != nil {
+		return 0, nil, err
 	}
 
 	secretMap[userID].resetExpiration()
@@ -325,7 +438,8 @@ func AuthParams(userID uint, timeInt int, path string, messageHMAC []byte) (bool
 	// rejects if times are more than 30 seconds apart
 	// used to be 10, but sometimes had authentication rejects because of it
 	if delay < -30 || delay > 30 {
-		return false, errors.New("Time difference too large")
+		// return false, errors.New("Time difference too large")
+		log.Printf("client: %d, server: %d\n", int64(timeInt), time.Now().Unix())
 	}
 
 	secret, ok := secretMap[userID]

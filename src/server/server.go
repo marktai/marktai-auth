@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+var requireEmail bool
 var requireAuth bool
 
 func Log(handler http.HandlerFunc) http.HandlerFunc {
@@ -19,24 +20,40 @@ func Log(handler http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
-func Run(port int, disableAuth bool) {
+func Run(port int, disableAuth bool, disableEmail bool) {
 	//start := time.Now()
 	r := mux.NewRouter()
 	requireAuth = !disableAuth
+	requireEmail = !disableEmail
 	recaptcha.ReadSecret("./creds/recaptcha.json", "www.marktai.com")
 
 	// user requests
 	r.HandleFunc("/login", Log(login)).Methods("POST")
 	r.HandleFunc("/verifySecret", Log(verifySecret)).Methods("POST")
 	r.HandleFunc("/users", Log(makeUser)).Methods("POST")
+	r.HandleFunc("/register/{userID:[0-9]+}/{registrationCode:[0-9a-fA-F]+}", Log(registerUser)).Methods("GET")
 
 	r.HandleFunc("/changePassword", Log(changePassword)).Methods("POST")
 
 	r.HandleFunc("/authHeaders", Log(authHeaders)).Methods("POST")
+	r.HandleFunc("/email", Log(sendEmail)).Methods("POST")
 
+	authMessage := ""
+	emailMessage := ""
 	for {
-		log.Printf("Running at 0.0.0.0:%d\n", port)
+		if requireAuth {
+			authMessage = "with authentication"
+		} else {
+			authMessage = "without authentication"
+		}
+
+		if requireEmail {
+			emailMessage = "with emails"
+		} else {
+			emailMessage = "without emails"
+		}
+		log.Printf("Running at 0.0.0.0:%d, %s, %s\n", port, authMessage, emailMessage)
 		log.Println(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", port), r))
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }

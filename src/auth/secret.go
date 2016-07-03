@@ -10,8 +10,9 @@ import (
 var secretMap = make(map[uint]*Secret)
 
 type Secret struct {
-	value      *big.Int
-	expiration time.Time
+	value        *big.Int
+	expiration   time.Time
+	stayLoggedIn bool
 }
 
 // secrets are an arbitrary big int number from 0 to 2^512
@@ -39,14 +40,27 @@ func (s *Secret) ExpirationUTC() string {
 }
 
 func (s *Secret) resetExpiration() {
-	s.expiration = time.Now().Add(30 * time.Minute)
+	var newTime time.Time
+	if !s.stayLoggedIn {
+		newTime = time.Now().Add(30 * time.Minute)
+	} else {
+		newTime = time.Now().Add(7 * 24 * time.Hour)
+	}
+
+	if newTime.After(s.expiration) {
+		s.expiration = newTime
+	}
+}
+
+func (s *Secret) setExpiration(dur time.Duration) {
+	s.expiration = time.Now().Add(dur)
 }
 
 var bitSize int64 = 512
 
 var limit *big.Int
 
-func newSecret() (*Secret, error) {
+func newSecret(stayLoggedIn bool) (*Secret, error) {
 	if limit == nil {
 		limit = big.NewInt(2)
 		limit.Exp(big.NewInt(2), big.NewInt(bitSize), nil)
@@ -58,6 +72,7 @@ func newSecret() (*Secret, error) {
 	}
 	retSecret := &Secret{}
 	retSecret.value = value
+	retSecret.stayLoggedIn = stayLoggedIn
 	retSecret.resetExpiration()
 
 	return retSecret, nil

@@ -81,6 +81,46 @@ func login(w http.ResponseWriter, r *http.Request) {
 	WriteJson(w, retMap)
 }
 
+func logout(w http.ResponseWriter, r *http.Request) {
+	authed, err := auth.AuthRequestHeaders(r)
+
+	if err != nil || !authed {
+		if err != nil {
+			log.Println(err)
+		}
+		WriteErrorString(w, "Not Authorized Request", 401)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	var parsedJson map[string]string
+	err = decoder.Decode(&parsedJson)
+	if err != nil {
+		WriteErrorString(w, err.Error()+" in parsing POST body (JSON)", 400)
+		return
+	}
+
+	userIDString, ok := parsedJson["UserID"]
+	if !ok {
+		WriteErrorString(w, "No 'UserID' set in POST body", 400)
+		return
+	}
+
+	userID, err := stringtoUint(userIDString)
+	if err != nil {
+		WriteError(w, err, 400)
+	}
+
+	err = auth.Logout(userID)
+	if err != nil {
+		WriteError(w, err, 500)
+		return
+	}
+
+	w.WriteHeader(200)
+
+}
+
 func verifySecret(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)

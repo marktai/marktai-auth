@@ -71,7 +71,9 @@ func getUniqueID() (uint, error) {
 	for conflict || newID == 0 {
 		count += 1
 		newID = (count*scale + addConst) % 65536
-
+		if newID == 0 {
+			continue
+		}
 		conflict, err = checkIDConflict(newID)
 		if err != nil {
 			return 0, err
@@ -330,6 +332,14 @@ func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 	secretMap[userID].resetExpiration()
 
 	return userID, secretMap[userID], nil
+}
+
+//
+func Logout(userID uint) error {
+	if _, ok := secretMap[userID]; ok {
+		delete(secretMap, userID)
+	}
+	return nil
 }
 
 // if the user and secret are correct, refreshes the secret

@@ -82,7 +82,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
-	authed, err := auth.AuthRequestHeaders(r)
+	authed, err := auth.AuthRequestHeadersAndPath(r)
 
 	if err != nil || !authed {
 		if err != nil {
@@ -279,7 +279,7 @@ func checkRegistered(w http.ResponseWriter, r *http.Request) {
 		WriteErrorString(w, "Error parsing userID", 400)
 		return
 	}
-	authed, err := auth.AuthRequestHeaders(r)
+	authed, err := auth.AuthRequestHeadersAndPath(r)
 	if err != nil || !authed {
 		ignore := false
 		if err != nil {

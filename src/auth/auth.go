@@ -447,6 +447,22 @@ func AuthRequestHeaders(r *http.Request) (bool, error) {
 	return AuthParams(userID, timeInt, path, messageHMAC)
 }
 
+// Verifies whether a request is correctly authorized and has a correct path
+func AuthRequestHeadersAndPath(r *http.Request) (bool, error) {
+	userID, timeInt, path, messageHMAC, err := parseRequestHeaders(r)
+	if err != nil {
+		return false, err
+	}
+
+	requestPath := r.URL.String()
+
+	if requestPath != path {
+		return false, errors.New("Paths do not match")
+	}
+
+	return AuthParams(userID, timeInt, path, messageHMAC)
+}
+
 func AuthParams(userID uint, timeInt int, path string, messageHMAC []byte) (bool, error) {
 
 	message := fmt.Sprintf("%d:%s", timeInt, path)

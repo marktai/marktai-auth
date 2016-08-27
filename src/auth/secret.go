@@ -70,9 +70,10 @@ func newSecret(stayLoggedIn bool) (*Secret, error) {
 	if err != nil {
 		return nil, err
 	}
-	retSecret := &Secret{}
-	retSecret.value = value
-	retSecret.stayLoggedIn = stayLoggedIn
+	retSecret := &Secret{
+		value:        value,
+		stayLoggedIn: stayLoggedIn,
+	}
 	retSecret.resetExpiration()
 
 	return retSecret, nil

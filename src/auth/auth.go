@@ -281,6 +281,12 @@ func ChangePassword(userID uint, pass string) error {
 	return err
 }
 
+func CheckRegistered(userID uint) (bool, error) {
+	var registered bool
+	err := db.Db.QueryRow("SELECT registered FROM users WHERE userid=?", userID).Scan(&registered)
+	return registered, err
+}
+
 // returns the salthash of a user
 func getSaltHash(userID uint) ([]byte, error) {
 	saltHashString := ""
@@ -293,6 +299,7 @@ func getSaltHash(userID uint) ([]byte, error) {
 }
 
 // if a successful login, generates a secret or refreshes the existing one
+// if user is unregistered, returns no secret
 func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 	// username santization in GetUserID
 	userID, err := GetUserID(user)
@@ -311,14 +318,6 @@ func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 		return 0, nil, err
 	}
 
-	if _, ok := secretMap[userID]; !ok || secretMap[userID].Expired() {
-		secret, err := newSecret(stayLoggedIn)
-		if err != nil {
-			return 0, nil, err
-		}
-		secretMap[userID] = secret
-	}
-
 	updateLastLogin, err := db.Db.Prepare("UPDATE users set lastlogin=? where userid=?")
 	if err != nil {
 		return 0, nil, err
@@ -329,12 +328,20 @@ func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 		return 0, nil, err
 	}
 
-	secretMap[userID].resetExpiration()
+	if _, ok := secretMap[userID]; !ok || secretMap[userID].Expired() {
+		secret, err := newSecret(stayLoggedIn)
+		if err != nil {
+			return 0, nil, err
+		}
+		secretMap[userID] = secret
+	} else {
+		secretMap[userID].resetExpiration()
+	}
 
 	return userID, secretMap[userID], nil
 }
 
-//
+// you probably can figure out what this one does
 func Logout(userID uint) error {
 	if _, ok := secretMap[userID]; ok {
 		delete(secretMap, userID)
@@ -450,6 +457,14 @@ func AuthParams(userID uint, timeInt int, path string, messageHMAC []byte) (bool
 	if delay < -30 || delay > 30 {
 		// return false, errors.New("Time difference too large")
 		log.Printf("client: %d, server: %d\n", int64(timeInt), time.Now().Unix())
+	}
+
+	registered, err := CheckRegistered(userID)
+	if err != nil {
+		return false, err
+	}
+	if !registered {
+		return false, errors.New("User is not registered")
 	}
 
 	secret, ok := secretMap[userID]

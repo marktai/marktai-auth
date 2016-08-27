@@ -122,7 +122,6 @@ func logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifySecret(w http.ResponseWriter, r *http.Request) {
-
 	decoder := json.NewDecoder(r.Body)
 	var parsedJson map[string]string
 	err := decoder.Decode(&parsedJson)
@@ -254,7 +253,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := stringtoUint(vars["userID"])
 	if err != nil {
-		WriteError(w, err, 400)
+		WriteErrorString(w, "Error parsing userID", 400)
 		return
 	}
 
@@ -267,6 +266,37 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "https://www.marktai.com/meta-tic-tac-toe/", 302)
+}
+
+func checkRegistered(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID, err := stringtoUint(vars["userID"])
+	if err != nil {
+		WriteErrorString(w, "Error parsing userID", 400)
+		return
+	}
+	authed, err := auth.AuthRequestHeaders(r)
+	if err != nil || !authed {
+		ignore := false
+		if err != nil {
+			if err.Error() == "User is not registered" {
+				ignore = true
+			} else {
+				log.Println(err)
+			}
+		}
+		if !ignore {
+			WriteErrorString(w, "Not Authorized Request", 401)
+			return
+		}
+	}
+
+	registered, err := auth.CheckRegistered(userID)
+	if err != nil {
+		WriteError(w, err, 500)
+	}
+
+	WriteJson(w, genMap("Registered", registered))
 }
 
 func changePassword(w http.ResponseWriter, r *http.Request) {
@@ -301,14 +331,12 @@ func changePassword(w http.ResponseWriter, r *http.Request) {
 	if requireAuth {
 		userID, _, err = auth.Login(user, pass, false)
 		if err != nil {
-			log.Println(err)
 			WriteErrorString(w, "Not Authorized Request", 401)
 			return
 		}
 	} else {
 		userID, err = auth.GetUserID(user)
 		if err != nil {
-			log.Println(err)
 			WriteErrorString(w, "No user with that username", 401)
 			return
 		}

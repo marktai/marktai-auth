@@ -1,4 +1,4 @@
-# Tic Tac Toe Squared Server
+# Authorization Server
 
 A server to handle authorization for marktai.com
 
@@ -10,8 +10,6 @@ This is written in Go
  *  NGINX server to reverse proxy (so separate apps are separate processes)
 
 ## API
-
-Auth Headers = {""}
 
     URL | Paramaters | Return Value on Success
     --- | ---------- | -----------------------
@@ -34,7 +32,7 @@ Auth Headers = {""}
     Encoding | encoding format for HMAC (if not provided, defaults to hex) 
     Time-Sent | seconds since epoch (fails if more than 10 seconds away from time received)
 
-    The HMAC uses (seconds in epoch):(path including initial / and without the T9) as the message and the login secret (in base 64 parsed as a string) as a secret.
+The HMAC uses (seconds in epoch):(path including initial / and without the T9) as the message and the login secret (in base 64 parsed as a string) as a secret.
 
 ####Example:
 

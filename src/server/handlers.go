@@ -2,17 +2,14 @@ package server
 
 import (
 	"auth"
-	"encoding/json"
-	"fmt"
-	// "github.com/gorilla/mux"
-	// "io/ioutil"
 	"email"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	// "errors"
-	"log"
-	// "math/rand"
 	valid "github.com/asaskevich/govalidator"
+	"log"
 	"net/http"
 	"recaptcha"
 	"strconv"
@@ -23,13 +20,17 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	var parsedJson map[string]string
 	if encodedAuth := r.Header.Get("Authorization"); encodedAuth != "" {
+		// support for HTTP Authorization header
+		// https://en.wikipedia.org/wiki/Basic_access_authentication
 		authBytes, err := base64.StdEncoding.DecodeString(encodedAuth)
 		if err != nil {
-			//ERROR
+			WriteErrorString(w, "Error decoding base64 in 'Authorization' header", 400)
+			return
 		}
 		auth := string(authBytes[:])
 		if strings.Count(auth, ":") != 1 {
-			// ERROR
+			WriteErrorString(w, "Not exactly 1 colon in 'Authorization' header", 400)
+			return
 		}
 		authSlice := strings.Split(auth, ":")
 
@@ -37,7 +38,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		parsedJson["User"] = authSlice[0]
 		parsedJson["Password"] = authSlice[1]
 	} else {
-
 		decoder := json.NewDecoder(r.Body)
 
 		err := decoder.Decode(&parsedJson)
@@ -71,7 +71,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	userID, secret, err := auth.Login(user, pass, stayLoggedIn)
 	if err != nil {
-		// hides details about server from login attempts"
+		// hides details about server from login attempts
 		log.Println(err)
 		WriteErrorString(w, "User and password combination incorrect", 401)
 		return
@@ -228,7 +228,7 @@ func makeUser(w http.ResponseWriter, r *http.Request) {
 		}
 		subject := "Email Registration for marktai.com"
 
-		link := fmt.Sprintf("https://www.marktai.com/T9/auth/register/%d/%s", userID, codeString)
+		link := fmt.Sprintf("https://www.marktai.com/T9/auth/users/%d/register?code=%s", userID, codeString)
 
 		body := fmt.Sprintf("Dear %s, \nPlease use the following link to register your account:\n\t%s\n\nFrom,\nMark Tai", user, link)
 
@@ -257,7 +257,11 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	registrationCode := vars["registrationCode"]
+	registrationCode := r.FormValue("code")
+	if registrationCode == "" {
+		WriteErrorString(w, "No 'code' query given", 400)
+		return
+	}
 
 	err = auth.UseRegistrationCode(userID, registrationCode)
 	if err != nil {

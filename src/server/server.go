@@ -27,18 +27,16 @@ func Run(port int, disableAuth bool, disableEmail bool) {
 	requireEmail = !disableEmail
 	recaptcha.ReadSecret("./creds/recaptcha.json", "www.marktai.com")
 
-	// user requests
 	r.HandleFunc("/login", Log(login)).Methods("POST")
 	r.HandleFunc("/logout", Log(logout)).Methods("POST")
 	r.HandleFunc("/verifySecret", Log(verifySecret)).Methods("POST")
 	r.HandleFunc("/users", Log(makeUser)).Methods("POST")
-	r.HandleFunc("/register/{userID:[0-9]+}/{registrationCode:[0-9a-fA-F]+}", Log(registerUser)).Methods("GET")
+	r.HandleFunc("/users/{userID:[0-9]+}/register", Log(registerUser)).Methods("GET")
 	r.HandleFunc("/users/{userID:[0-9]+}/registered", Log(checkRegistered)).Methods("GET")
 
 	r.HandleFunc("/changePassword", Log(changePassword)).Methods("POST")
 
 	r.HandleFunc("/authHeaders", Log(authHeaders)).Methods("POST")
-	r.HandleFunc("/email", Log(sendEmail)).Methods("POST")
 
 	authMessage := ""
 	emailMessage := ""

@@ -298,9 +298,72 @@ func checkRegistered(w http.ResponseWriter, r *http.Request) {
 	registered, err := auth.CheckRegistered(userID)
 	if err != nil {
 		WriteError(w, err, 500)
+		return
 	}
 
 	WriteJson(w, genMap("Registered", registered))
+}
+
+func getID(w http.ResponseWriter, r *http.Request) {
+
+	authed, err := auth.AuthRequestHeadersAndPath(r)
+	if err != nil || !authed {
+		if err != nil {
+			log.Println(err)
+		}
+		WriteErrorString(w, "Not Authorized Request", 401)
+		return
+	}
+
+	usernamesSlice := make([]string, 0)
+	username := r.FormValue("username")
+	if username != "" {
+		usernamesSlice = append(usernamesSlice, username)
+	}
+
+	usernames := r.FormValue("usernames")
+	if usernames != "" {
+		usernamesSlice = append(usernamesSlice, strings.Split(usernames, ",")...)
+	}
+
+	if len(usernamesSlice) == 0 {
+		WriteErrorString(w, "No usernames provided", 400)
+		return
+	}
+
+	cleanedUsernames := make([]string, 0)
+	for _, usernames := range usernamesSlice {
+		if usernames != "" {
+			cleanedUsernames = append(cleanedUsernames, usernames)
+		}
+	}
+
+	if len(cleanedUsernames) == 0 {
+		WriteErrorString(w, "No valid usernames provided", 400)
+		return
+	}
+
+	userIDs, errs := auth.GetUserIDs(cleanedUsernames)
+
+	retMap := make(map[string]interface{})
+
+	usernameIDMap := make(map[string]uint)
+	for i, username := range cleanedUsernames {
+		if userIDs[i] != 0 {
+			usernameIDMap[username] = userIDs[i]
+		}
+	}
+	errorMap := make(map[string]error)
+	for i, username := range cleanedUsernames {
+		if errs[i] != nil {
+			errorMap[username] = errs[i]
+		}
+	}
+
+	retMap["UserIDs"] = usernameIDMap
+	retMap["Errors"] = errorMap
+
+	WriteJson(w, retMap)
 }
 
 func changePassword(w http.ResponseWriter, r *http.Request) {

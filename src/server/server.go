@@ -33,6 +33,7 @@ func Run(port int, disableAuth bool, disableEmail bool) {
 	r.HandleFunc("/users", Log(makeUser)).Methods("POST")
 	r.HandleFunc("/users/{userID:[0-9]+}/register", Log(registerUser)).Methods("GET")
 	r.HandleFunc("/users/{userID:[0-9]+}/registered", Log(checkRegistered)).Methods("GET")
+	r.HandleFunc("/users/getID", Log(getID)).Methods("GET")
 
 	r.HandleFunc("/changePassword", Log(changePassword)).Methods("POST")
 

@@ -109,6 +109,44 @@ func GetUserID(user string) (uint, error) {
 	return userID, nil
 }
 
+type userIDResponse struct {
+	i      int
+	userID uint
+	err    error
+}
+
+// returns the userids of a list of usernames
+func GetUserIDs(usernames []string) ([]uint, []error) {
+	queryCount := 0
+	responseChan := make(chan userIDResponse)
+	for i, username := range usernames {
+		go func(i int, username string) {
+			userID, err := GetUserID(username)
+			responseChan <- userIDResponse{
+				i:      i,
+				userID: userID,
+				err:    err,
+			}
+		}(i, username)
+		queryCount += 1
+	}
+
+	userIDs := make([]uint, queryCount)
+	errs := make([]error, queryCount)
+	// joining threads
+	for i := 0; i < queryCount; i++ {
+		response := <-responseChan
+		if response.err != nil {
+			userIDs[response.i] = 0
+			errs[response.i] = response.err
+		} else {
+			userIDs[response.i] = response.userID
+			errs[response.i] = nil
+		}
+	}
+	return userIDs, errs
+}
+
 // returns the username of a user
 func GetUsername(userID uint) (string, error) {
 	var username string

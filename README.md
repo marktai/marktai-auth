@@ -32,7 +32,7 @@ This is written in Go
     Encoding | encoding format for HMAC (if not provided, defaults to hex) 
     Time-Sent | seconds since epoch (fails if more than 10 seconds away from time received)
 
-The HMAC uses `$seconds_in_epoch:URL_path` as the message and the user login secret (in base 64 parsed as a string) as a secret.
+The HMAC uses `$seconds_in_epoch:$URL_path` as the message and the user login secret (in base 64 parsed as a string) as a secret.
 
 #### Example:
 

@@ -32,17 +32,17 @@ This is written in Go
     Encoding | encoding format for HMAC (if not provided, defaults to hex) 
     Time-Sent | seconds since epoch (fails if more than 10 seconds away from time received)
 
-The HMAC uses (seconds in epoch):(path including initial / and without the T9) as the message and the login secret (in base 64 parsed as a string) as a secret.
+The HMAC uses `$seconds_in_epoch:URL_path` as the message and the user login secret (in base 64 parsed as a string) as a secret.
 
-####Example:
+#### Example:
 
 I want to logout for user 54689, which is at https://www.marktai.com/T9/auth/logout
 
 * UserID = 54689
-* Secret = "3ar+0wLwgiltTXNZ/eprJ2NaWE7y5k+0r9ThN4+im8RHWH8ksB1xw4554hOTNF8H9rguMBfUaNRWztNQb+nz7A=="
+* Secret for 54689 = "3ar+0wLwgiltTXNZ/eprJ2NaWE7y5k+0r9ThN4+im8RHWH8ksB1xw4554hOTNF8H9rguMBfUaNRWztNQb+nz7A=="
 * Path = "/logout"
 * Time-Sent = 1472276742
 
 This results in "1472276742:/logout" as the message, and the secret is "3ar+0wLwgiltTXNZ/eprJ2NaWE7y5k+0r9ThN4+im8RHWH8ksB1xw4554hOTNF8H9rguMBfUaNRWztNQb+nz7A=="
 
-Therefore, the HMAC is "69aee4c4d9749a6e27c583af898840927975ea861b9d74dc54ef2e3cde14b7c4", verifiable at http://www.freeformatter.com/hmac-generator.html
+Therefore, the HMAC that the server expects is "69aee4c4d9749a6e27c583af898840927975ea861b9d74dc54ef2e3cde14b7c4", verifiable at http://www.freeformatter.com/hmac-generator.html

@@ -1,6 +1,6 @@
-# Authorization Server
+# Authentication Server
 
-A server to handle authorization for marktai.com
+A server to handle authentication for marktai.com
 
 This is written in Go
 

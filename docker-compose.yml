@@ -1,0 +1,20 @@
+version: '3.3'
+
+services:
+  db:
+    image: postgres:14.2-alpine
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - database:/var/lib/postgresql/data
+    restart: always
+  backend:
+    image: auth/backend:latest
+    build: ./backend
+    ports:
+      - "8043:8043"
+    depends_on:
+      - db
+    restart: always
+volumes:
+  database:

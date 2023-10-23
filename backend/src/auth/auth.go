@@ -48,9 +48,9 @@ func stringtoUint(s string) (uint, error) {
 
 // checks if user id conflict in database
 func checkIDConflict(id uint) (bool, error) {
-	collision := 1
-	err := db.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE userid=?)", id).Scan(&collision)
-	return collision != 0, err
+	collision := true
+	err := db.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE userid=$1)", id).Scan(&collision)
+	return collision != false, err
 }
 
 // returns a unique id for a user
@@ -62,7 +62,7 @@ func getUniqueID() (uint, error) {
 
 	var newID uint
 
-	err := db.Db.QueryRow("SELECT count, scale, addConst FROM count WHERE type='users'").Scan(&count, &scale, &addConst)
+	err := db.Db.QueryRow("SELECT count, scale, add_const FROM count WHERE type='users'").Scan(&count, &scale, &addConst)
 	if err != nil {
 		return 0, err
 	}
@@ -80,7 +80,7 @@ func getUniqueID() (uint, error) {
 		}
 	}
 
-	updateCount, err := db.Db.Prepare("UPDATE count SET count=? WHERE type='users'")
+	updateCount, err := db.Db.Prepare("UPDATE count SET count=$1 WHERE type='users'")
 	if err != nil {
 		return newID, err
 	}
@@ -101,7 +101,7 @@ func GetUserID(user string) (uint, error) {
 	} else if bad {
 		return 0, errors.New("Invalid user name")
 	}
-	err := db.Db.QueryRow("SELECT userid FROM users WHERE name=?", user).Scan(&userID)
+	err := db.Db.QueryRow("SELECT userid FROM users WHERE name=$1", user).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
@@ -151,7 +151,7 @@ func GetUserIDs(usernames []string) ([]uint, []error) {
 func GetUsername(userID uint) (string, error) {
 	var username string
 
-	err := db.Db.QueryRow("SELECT name FROM users WHERE userid=?", userID).Scan(&username)
+	err := db.Db.QueryRow("SELECT name FROM users WHERE userid=$1", userID).Scan(&username)
 	if err != nil {
 		return "", err
 	}
@@ -189,7 +189,7 @@ func MakeUser(user, pass, email string) (uint, error) {
 	}
 
 	if email == "" {
-		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, salthash, created) VALUES(?, ?, ?, ?)")
+		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, salthash, created) VALUES($1, $2, $3, $4)")
 		if err != nil {
 			return 0, err
 		}
@@ -199,7 +199,7 @@ func MakeUser(user, pass, email string) (uint, error) {
 			return 0, err
 		}
 	} else {
-		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, email, salthash, created) VALUES(?, ?, ?, ?, ?)")
+		addUser, err := db.Db.Prepare("INSERT INTO users (userid, name, email, salthash, created) VALUES($1, $2, $3, $4, $5)")
 		if err != nil {
 			return 0, err
 		}
@@ -224,7 +224,7 @@ func MakeUser(user, pass, email string) (uint, error) {
 func GetCode(userID uint, codeType uint) (string, error) {
 	codeString := ""
 
-	err := db.Db.QueryRow("SELECT code FROM codes WHERE userid=? AND type=?", userID, codeType).Scan(&codeString)
+	err := db.Db.QueryRow("SELECT code FROM codes WHERE userid=$1 AND type=$2", userID, codeType).Scan(&codeString)
 	if err != nil {
 		return "", err
 	}
@@ -238,7 +238,7 @@ func GetRegistrationCode(userID uint) (string, error) {
 
 func UseCode(userID, codeType uint, codeString string) error {
 	var exists bool
-	err := db.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM codes WHERE userid=? AND type=? AND code=?)", userID, codeType, codeString).Scan(&exists)
+	err := db.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM codes WHERE userid=$1 AND type=$2 AND code=$3)", userID, codeType, codeString).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func UseCode(userID, codeType uint, codeString string) error {
 		return errors.New("Code is invalid")
 	}
 
-	addUser, err := db.Db.Prepare("DELETE FROM codes WHERE userid=? AND type=? AND code=?")
+	addUser, err := db.Db.Prepare("DELETE FROM codes WHERE userid=$1 AND type=$2 AND code=$3")
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func UseRegistrationCode(userID uint, codeString string) error {
 		return err
 	}
 
-	addUser, err := db.Db.Prepare("UPDATE users SET registered=1 WHERE userid=?")
+	addUser, err := db.Db.Prepare("UPDATE users SET registered=1 WHERE userid=$1")
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func GenerateCode(userID, codeType uint) error {
 
 	codeString := hex.EncodeToString(codeBytes)
 
-	addUser, err := db.Db.Prepare("INSERT INTO codes (userid, type, code) VALUES(?, ?, ?)")
+	addUser, err := db.Db.Prepare("INSERT INTO codes (userid, type, code) VALUES($1, $2, $3)")
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func ChangePassword(userID uint, pass string) error {
 	}
 	saltHashString := base64.StdEncoding.EncodeToString(saltHash)
 
-	changePass, err := db.Db.Prepare("UPDATE users set salthash=? where userid=?")
+	changePass, err := db.Db.Prepare("UPDATE users set salthash=$1 where userid=$2")
 	if err != nil {
 		return err
 	}
@@ -321,14 +321,14 @@ func ChangePassword(userID uint, pass string) error {
 
 func CheckRegistered(userID uint) (bool, error) {
 	var registered bool
-	err := db.Db.QueryRow("SELECT registered FROM users WHERE userid=?", userID).Scan(&registered)
+	err := db.Db.QueryRow("SELECT registered FROM users WHERE userid=$1", userID).Scan(&registered)
 	return registered, err
 }
 
 // returns the salthash of a user
 func getSaltHash(userID uint) ([]byte, error) {
 	saltHashString := ""
-	err := db.Db.QueryRow("SELECT salthash FROM users WHERE userid=?", userID).Scan(&saltHashString)
+	err := db.Db.QueryRow("SELECT salthash FROM users WHERE userid=$1", userID).Scan(&saltHashString)
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +356,7 @@ func Login(user, pass string, stayLoggedIn bool) (uint, *Secret, error) {
 		return 0, nil, err
 	}
 
-	updateLastLogin, err := db.Db.Prepare("UPDATE users set lastlogin=? where userid=?")
+	updateLastLogin, err := db.Db.Prepare("UPDATE users set lastlogin=$1 where userid=$2")
 	if err != nil {
 		return 0, nil, err
 	}
